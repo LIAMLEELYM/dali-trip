@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>大理 5天路線地圖</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif}
+#top{position:absolute;z-index:1000;top:0;left:0;right:0;padding:8px;background:linear-gradient(#000a,#0000);pointer-events:none}
+#top>*{pointer-events:auto}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.row a,.row button{border:0;border-radius:18px;padding:6px 12px;font-size:13px;font-weight:700;background:#fffe;color:#333;text-decoration:none;cursor:pointer}
+.row button.on{color:#fff}
+#info{margin-top:6px;display:inline-block;background:#fffd;border-radius:10px;padding:6px 10px;font-size:13px;max-width:92%}
+#map{position:absolute;inset:0;background:#123}
+.lbl{background:#fffd;border-radius:14px;padding:2px 9px;font-size:13px;font-weight:700;color:#222;white-space:nowrap;border:2px solid var(--c,#fff);box-shadow:0 1px 4px #0006}
+.pin{width:14px;height:14px;border-radius:50%;background:var(--c);border:3px solid #fff;box-shadow:0 0 4px #000a}
+.dayl{font-size:22px;font-weight:900;color:var(--c);text-shadow:0 0 4px #fff,0 0 4px #fff,0 0 6px #fff;white-space:nowrap}
+.couple{filter:drop-shadow(0 2px 2px #0008);image-rendering:pixelated}
+.leaflet-popup-content img{width:200px;aspect-ratio:4/3;object-fit:cover;border-radius:6px;display:block;margin-top:6px}
+#note{position:absolute;z-index:1000;bottom:6px;left:6px;background:#fffc;border-radius:8px;padding:3px 8px;font-size:11px;color:#444}
+</style></head><body>
+<div id="top"><div class="row" id="btns"></div><div id="info">點選 Day 查看路線；▶ 讓情侶公仔走一遍</div></div>
+<div id="map"></div><div id="note">路線為示意，座標約略；衛星圖 © Esri</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ====== 可自行修改：地點座標 [緯度, 經度] ====== */
+const P={
+ airport:{n:'鳳儀機場',c:[25.6486,100.3197]},
+ gucheng:{n:'大理古城',c:[25.6937,100.1646]},
+ mogu:{n:'採菌集合點（大理大學下關校區）',c:[25.6000,100.2300]},
+ longkan:{n:'龍龕碼頭',c:[25.7010,100.1930]},
+ xizhou:{n:'喜洲古鎮',c:[25.8506,100.1417]},
+ lixiang:{n:'理想邦（松雲懸崖酒店）',c:[25.7330,100.2660]},
+ xpt:{n:'小普陀',c:[25.8090,100.2220]},
+ sl:{n:'雙廊古鎮（全季酒店）',c:[25.9340,100.2010]}
+};
+/* ====== 每天路線（經過的點，按順序）====== */
+const D=[
+ {d:1,col:'#ff7a45',t:'10/16 抵達 · 古城',desc:'機場 → 古城，逛廣武路 / 銀蒼路 / 人民路',
+  path:[P.airport.c,[25.6300,100.2900],[25.6200,100.2400],[25.6400,100.2000],[25.6700,100.1750],P.gucheng.c],
+  stops:['airport','gucheng'],img:'images/day1-1.jpg'},
+ {d:2,col:'#f5c518',t:'10/17 採菌 · 生態廊道 · 喜洲',desc:'古城 → 下關採菌 → 返回 → 海西生態廊道騎行 → 喜洲',
+  path:[P.gucheng.c,[25.6500,100.1850],P.mogu.c,[25.6500,100.1850],P.gucheng.c,[25.6980,100.1900],P.longkan.c,[25.7350,100.1930],[25.7700,100.1870],[25.8100,100.1760],[25.8350,100.1650],[25.8500,100.1500],P.xizhou.c],
+  stops:['gucheng','mogu','longkan','xizhou'],img:'images/day2-1.jpg'},
+ {d:3,col:'#2ecc71',t:'10/18 轉場 · 理想邦',desc:'古城 → 繞南端經下關 → 海東理想邦（懸崖酒店）',
+  path:[P.gucheng.c,[25.6500,100.1850],[25.6050,100.2150],[25.6250,100.2650],[25.6850,100.2800],P.lixiang.c],
+  stops:['gucheng','lixiang'],img:'images/day3-1.jpg'},
+ {d:4,col:'#3aa0ff',t:'10/19 旅拍 · 雙廊 · 小普陀',desc:'理想邦 → 小普陀 → 雙廊',
+  path:[P.lixiang.c,[25.7600,100.2650],[25.7800,100.2540],[25.7950,100.2330],P.xpt.c,[25.8350,100.2250],[25.8650,100.2300],[25.9000,100.2150],P.sl.c],
+  stops:['lixiang','xpt','sl'],img:'images/day4-1.jpg'},
+ {d:5,col:'#b46bff',t:'10/20 返程 · 11:25 航班',desc:'雙廊 → 海東沿岸 → 鳳儀機場',
+  path:[P.sl.c,[25.9000,100.2150],[25.8350,100.2250],[25.7800,100.2540],[25.7330,100.2660],[25.6900,100.3000],P.airport.c],
+  stops:['sl','airport'],img:null}
+];
+const map=L.map('map',{zoomControl:false}).setView([25.78,100.22],10);
+L.control.zoom({position:'bottomright'}).addTo(map);
+const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,attribution:'Esri'}).addTo(map);
+const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'OSM'});
+L.control.layers({'衛星':sat,'街道':osm},null,{position:'bottomright'}).addTo(map);
+function smooth(p,n=3){for(let k=0;k<n;k++){const q=[p[0]];for(let i=0;i<p.length-1;i++){const a=p[i],b=p[i+1];q.push([.75*a[0]+.25*b[0],.75*a[1]+.25*b[1]],[.25*a[0]+.75*b[0],.25*a[1]+.75*b[1]])}q.push(p[p.length-1]);p=q}return p}
+D.forEach(x=>x.sp=smooth(x.path));
+const layers=[];
+D.forEach(x=>{
+ const g=L.layerGroup();
+ L.polyline(x.sp,{color:'#fff',weight:8,opacity:.6}).addTo(g);
+ L.polyline(x.sp,{color:x.col,weight:5,lineCap:'round',dashArray:x.d%2?null:'12 8'}).addTo(g);
+ const mid=x.sp[Math.floor(x.sp.length/2)];
+ L.marker(mid,{icon:L.divIcon({className:'',html:`<div class="dayl" style="--c:${x.col}">Day${x.d}</div>`,iconAnchor:[0,0]}),interactive:false}).addTo(g);
+ x.stops.forEach(k=>{const p=P[k];
+  const m=L.marker(p.c,{icon:L.divIcon({className:'',html:`<div style="display:flex;align-items:center;gap:4px;transform:translate(-7px,-7px)"><div class="pin" style="--c:${x.col}"></div><div class="lbl" style="--c:${x.col}">${p.n}</div></div>`,iconSize:[0,0]})}).addTo(g);
+  m.bindPopup(`<b>${p.n}</b><br>Day${x.d}：${x.desc}${x.img?`<img src="${x.img}">`:''}`)});
+ layers.push(g);g.addTo(map);
+});
+const BOY=['....KKKKKK......','...KBBBBBBK.....','..KBBBBBBBBK....','..KBSSSSSSBK....','..KSSKSSKSSK....','..KSSSSSSSSK....','...KSSRRSSK.....','....KKSSKK......','...KWWWWWWK.....','..KWWWWWWWWK....','..KSKWWWWKSK....','..KSKWWWWKSK....','...KKTTTTKK.....','....KTKKTK......','....KTK.KTK.....','...KKK...KKK....'];
+const GIRL=['....KKKKKK......','...KDDDDDDK.....','..KDDDDDDDDK....','..KDDSSSSDDK....','..KDSKSSKSDK....','..KDSSSSSSDK....','..KDDSRRSDDK....','...KDKSSKDK.....','...KRRRRRRK.....','..KSRRRRRRSK....','..KSKRRRRKSK....','...KRRRRRRK.....','..KRRRRRRRRK....','...KKSKKSKK.....','....KSK.KSK.....','...KKK...KKK....'];
+const COL={K:'#2b2b2b',B:'#6b4a2b',S:'#ffd7b0',R:'#e8423b',W:'#3f7fe0',T:'#34495e',D:'#3a2418'};
+function sprite(a){let r='';a.forEach((row,y)=>[...row].forEach((c,x)=>{if(COL[c])r+=`<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${COL[c]}"/>`}));return r}
+const coupleSVG=`<svg class="couple" width="64" height="40" viewBox="0 0 32 16" shape-rendering="crispEdges"><g>${sprite(BOY)}</g><g transform="translate(14,0)">${sprite(GIRL)}</g></svg>`;
+const cm=L.marker(D[0].sp[0],{icon:L.divIcon({className:'',html:coupleSVG,iconSize:[64,40],iconAnchor:[32,36]}),zIndexOffset:2000}).addTo(map);
+const btns=document.getElementById('btns'),info=document.getElementById('info');
+let cur='all',raf=null;
+function mk(txt,fn,col){const b=document.createElement('button');b.textContent=txt;if(col)b.dataset.col=col;b.onclick=fn;btns.appendChild(b);return b}
+const bs=[];
+const hb=document.createElement('a');hb.href='index.html';hb.textContent='← 攻略';btns.appendChild(hb);
+bs.push(mk('全部',()=>show('all')));
+D.forEach(x=>bs.push(mk('Day'+x.d,()=>show(x.d),x.col)));
+const pb=mk('▶ 播放',()=>play());pb.style.background='#ff4d6d';pb.style.color='#fff';
+function show(k){cur=k;stop();
+ layers.forEach((g,i)=>{const on=k==='all'||D[i].d===k;on?g.addTo(map):map.removeLayer(g)});
+ bs.forEach((b,i)=>{const on=(i===0&&k==='all')||(i>0&&D[i-1].d===k);b.classList.toggle('on',on);b.style.background=on?(i===0?'#2f7f86':b.dataset.col):'#fffe'});
+ if(k==='all'){map.fitBounds(L.latLngBounds(D.flatMap(x=>x.sp)),{padding:[30,30]});info.textContent='5 天總覽：古城 → 喜洲 → 理想邦 → 雙廊 → 機場';cm.setLatLng(D[0].sp[0])}
+ else{const x=D[k-1];map.fitBounds(L.latLngBounds(x.sp),{padding:[40,40]});info.innerHTML=`<b>Day${x.d}</b> ${x.t}<br>${x.desc}`;cm.setLatLng(x.sp[0])}}
+function stop(){if(raf)cancelAnimationFrame(raf);raf=null;pb.textContent='▶ 播放'}
+function play(){if(raf){stop();return}
+ const days=cur==='all'?D:[D[cur-1]];let di=0,t0=null;pb.textContent='⏸ 暫停';
+ function step(ts){const x=days[di];if(!t0)t0=ts;const dur=Math.max(4000,x.sp.length*45);let f=(ts-t0)/dur;
+  if(f>=1){di++;t0=null;if(di>=days.length){stop();return}raf=requestAnimationFrame(step);return}
+  const idx=f*(x.sp.length-1),i=Math.floor(idx),r=idx-i,a=x.sp[i],b=x.sp[Math.min(i+1,x.sp.length-1)];
+  cm.setLatLng([a[0]+(b[0]-a[0])*r,a[1]+(b[1]-a[1])*r]);
+  if(cur==='all')info.innerHTML=`<b>Day${x.d}</b> ${x.t}`;
+  raf=requestAnimationFrame(step)}
+ raf=requestAnimationFrame(step)}
+show('all');
+</script></body></html>
